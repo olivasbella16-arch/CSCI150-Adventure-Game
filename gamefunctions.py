@@ -1,114 +1,230 @@
 
-"""Functions for a text-based adventure game.
 
-This module handles the town menu, monster battles,
-sleeping, shopping, and player actions.
-"""
+"""Helper functions for the town adventure game and inventory system."""
 
 import random
 
 
-def purchase_item(itemPrice, startingMoney, quantityToPurchase):
-    """Calculate the number of items purchased and money remaining."""
-    quantity = min(quantityToPurchase, startingMoney // itemPrice)
-    moneyRemaining = startingMoney - (quantity * itemPrice)
-    return int(quantity), moneyRemaining
+def print_welcome(name, width):
+    """Display a centered welcome message."""
+    print(f"{'Hello, ' + name + '!':^{width}}")
 
 
 def random_monster():
-    """Generate a random monster with health and attack power."""
+    """Return a random monster name, health, and attack strength."""
     monsters = ["Goblin", "Dragon", "Skeleton", "Wolf"]
-    monster = random.choice(monsters)
-    health = random.randint(10, 20)
-    attack = random.randint(2, 5)
-    return monster, health, attack
+    return random.choice(monsters), random.randint(10, 20), random.randint(2, 5)
 
 
-def print_welcome(name, width):
-    """Print a centered welcome message for the player."""
-    message = f"Hello, {name}!"
-    print(f"{message:^{width}}")
-
-
-def print_shop_menu(item1Name, item1Price, item2Name, item2Price):
-    """Display a bordered shop menu with item names and prices."""
-    print("/" + "-" * 22 + "\\")
-    print(f"| {item1Name:<12} {f'${item1Price:.2f}':>8} |")
-    print(f"| {item2Name:<12} {f'${item2Price:.2f}':>8} |")
-    print("\\" + "-" * 22 + "/")
-
-
-def get_menu_choice():
-    """Display the town menu and validate the player's choice."""
-    print("\nWhat would you like to do?")
-    print("1) Leave town (Fight Monster)")
-    print("2) Sleep (Restore HP for 5 Gold)")
-    print("3) Quit")
-
-    choice = input("Enter your choice: ")
-
-    while choice not in ("1", "2", "3"):
-        print("Invalid choice. Please enter 1, 2, or 3.")
-        choice = input("Enter your choice: ")
-
+def get_choice(prompt, choices):
+    """Keep asking until the player enters an allowed choice."""
+    choice = input(prompt).strip()
+    while choice not in choices:
+        print("Invalid choice. Please try again.")
+        choice = input(prompt).strip()
     return choice
 
 
-def sleep(health, gold):
-    """Restore the player's health in exchange for five gold."""
-    if gold < 5:
-        print("You do not have enough gold!")
-    elif health >= 30:
+def town_menu(state):
+    """Display the player's status and town menu."""
+    print(f"\nYou are in town. HP: {state['player_hp']}/{state['max_hp']}  Gold: {state['player_gold']}")
+    print("1) Fight Monster")
+    print("2) Sleep (5 Gold)")
+    print("3) Shop")
+    print("4) Inventory")
+    print("5) Equip Weapon")
+    print("6) Quit")
+    return get_choice("Choose an option: ", ("1", "2", "3", "4", "5", "6"))
+
+
+def sleep(state):
+    """Restore the player's health for five gold."""
+    if state["player_hp"] >= state["max_hp"]:
         print("Your health is already full!")
+    elif state["player_gold"] < 5:
+        print("You do not have enough gold!")
     else:
-        health = 30
-        gold -= 5
+        state["player_gold"] -= 5
+        state["player_hp"] = state["max_hp"]
         print("You slept and restored your health!")
 
-    return health, gold
+
+def make_item(kind):
+    """Create a new item dictionary."""
+    if kind == "sword":
+        return {
+            "name": "Sword",
+            "type": "weapon",
+            "damage_bonus": 5,
+            "maxDurability": 5,
+            "currentDurability": 5,
+            "equipped": False
+        }
+    return {
+        "name": "Dragon Orb",
+        "type": "special",
+        "defeats": "Dragon"
+    }
 
 
-def get_fight_action():
-    """Display the combat menu and validate the player's choice."""
-    print("\nWhat would you like to do?")
-    print("1) Attack")
+def shop(state):
+    """Allow players to buy items and add them to inventory."""
+    while True:
+        print(f"\nShop - You have {state['player_gold']} gold")
+        print("1) Sword (+5 damage, 5 uses) - 20 Gold")
+        print("2) Dragon Orb (defeats one Dragon) - 15 Gold")
+        print("3) Return to town")
+
+        choice = get_choice("Choose an option: ", ("1", "2", "3"))
+        if choice == "3":
+            return
+
+        if choice == "1":
+            price = 20
+            kind = "sword"
+        else:
+            price = 15
+            kind = "orb"
+
+        if state["player_gold"] < price:
+            print("You do not have enough gold!")
+        else:
+            state["player_gold"] -= price
+            item = make_item(kind)
+            state["player_inventory"].append(item)
+            print(f"Purchased {item['name']}! Added to inventory.")
+
+
+def inventory(state):
+    """Display owned items and equipped weapons."""
+    print("\nYour inventory:")
+    if not state["player_inventory"]:
+        print("Your inventory is empty.")
+
+    for number, item in enumerate(state["player_inventory"], 1):
+        details = " (EQUIPPED)" if item.get("equipped") else ""
+        if item["type"] == "weapon":
+            details += f" - Durability {item['currentDurability']}/{item['maxDurability']}"
+        print(f"{number}) {item['name']} [{item['type']}]{details}")
+
+
+def equip_weapon(state):
+    """List only weapons and allow one to be equipped."""
+    weapons = [
+        item for item in state["player_inventory"]
+        if item["type"] == "weapon"
+    ]
+
+    print("\nChoose a weapon to equip:")
+    print("0) None (unequip)")
+
+    for number, item in enumerate(weapons, 1):
+        status = " (EQUIPPED)" if item["equipped"] else ""
+        print(f"{number}) {item['name']} - {item['currentDurability']} uses left{status}")
+
+    choices = [str(i) for i in range(len(weapons) + 1)]
+    choice = get_choice("Choose an option: ", choices)
+
+    for item in weapons:
+        item["equipped"] = False
+
+    if choice == "0":
+        print("No weapon equipped.")
+    else:
+        weapon = weapons[int(choice) - 1]
+        weapon["equipped"] = True
+        print(f"Equipped {weapon['name']}!")
+
+
+def equipped_weapon(state):
+    """Find the currently equipped weapon."""
+    for item in state["player_inventory"]:
+        if item["type"] == "weapon" and item.get("equipped"):
+            return item
+    return None
+
+
+def attack_monster(state, monster_hp):
+    """Attack the monster and reduce equipped weapon durability."""
+    damage = 5
+    weapon = equipped_weapon(state)
+
+    if weapon:
+        damage += weapon["damage_bonus"]
+        weapon["currentDurability"] -= 1
+        print(f"You attack with your {weapon['name']} for {damage} damage!")
+
+        if weapon["currentDurability"] <= 0:
+            state["player_inventory"].remove(weapon)
+            print("Your sword broke and was removed from inventory!")
+    else:
+        print(f"You attack for {damage} damage!")
+
+    return monster_hp - damage
+
+
+def find_orb(state, monster_name):
+    """Find a special item that can defeat this monster."""
+    for item in state["player_inventory"]:
+        if item["type"] == "special" and item["defeats"] == monster_name:
+            return item
+    return None
+
+
+def fight_action(state, monster_name):
+    """Display and validate the available combat actions."""
+    print("\n1) Attack")
     print("2) Run away")
+    options = ["1", "2"]
 
-    choice = input("Enter your choice: ")
+    if find_orb(state, monster_name):
+        print("3) Use Dragon Orb (instant victory)")
+        options.append("3")
 
-    while choice not in ("1", "2"):
-        print("Invalid choice. Please enter 1 or 2.")
-        choice = input("Enter your choice: ")
-
-    return choice
-
-
-def display_fight_statistics(health, monster_health):
-    """Display the player's and monster's current health."""
-    print("\nYour HP:", health)
-    print("Monster HP:", monster_health)
+    return get_choice("Choose an option: ", options)
 
 
-def fight_monster(health, gold):
-    """Run a monster battle until victory, defeat, or escape."""
-    monster, monster_health, monster_attack = random_monster()
-    print("\nA", monster, "appeared!")
+def combat_turn(state, monster_name, monster_hp, monster_attack):
+    """Perform one turn of combat."""
+    print(f"\nYour HP: {state['player_hp']}  {monster_name} HP: {monster_hp}")
+    action = fight_action(state, monster_name)
 
-    while health > 0 and monster_health > 0:
-        display_fight_statistics(health, monster_health)
-        action = get_fight_action()
-        if action == "2":
-            print("You ran away!")
-            break
-        monster_health -= 5
-        if monster_health > 0:
-            health -= monster_attack
+    if action == "2":
+        print("You ran away!")
+        return monster_hp, True
 
-    if health <= 0:
-        health = 0
+    if action == "3":
+        orb = find_orb(state, monster_name)
+        state["player_inventory"].remove(orb)
+        print(f"Your Dragon Orb defeated the {monster_name} without losing HP!")
+        return 0, False
+
+    monster_hp = attack_monster(state, monster_hp)
+
+    if monster_hp > 0:
+        state["player_hp"] = max(0, state["player_hp"] - monster_attack)
+        print(f"The {monster_name} hits you for {monster_attack} damage!")
+
+    return monster_hp, False
+
+
+def fight_monster(state):
+    """Fight until the monster falls, the player passes out, or escapes."""
+    if state["player_hp"] <= 0:
+        print("You have 0 HP. Sleep in town before fighting again!")
+        return
+
+    monster_name, monster_hp, monster_attack = random_monster()
+    print(f"\nA {monster_name} appeared!")
+    escaped = False
+
+    while state["player_hp"] > 0 and monster_hp > 0 and not escaped:
+        monster_hp, escaped = combat_turn(
+            state, monster_name, monster_hp, monster_attack
+        )
+
+    if state["player_hp"] <= 0:
         print("You passed out!")
-    elif monster_health <= 0:
-        gold += 3
-        print("You defeated the", monster, "and earned 3 gold!")
-
-    return health, gold
+    elif monster_hp <= 0:
+        state["player_gold"] += 3
+        print(f"You defeated the {monster_name} and earned 3 gold!")
