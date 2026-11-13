@@ -1,0 +1,21 @@
+{
+    "player_name": "Belal",
+    "player_hp": 21,
+    "max_hp": 30,
+    "player_gold": 68,
+    "player_inventory": [
+        {
+            "name": "Sword",
+            "type": "weapon",
+            "damage_bonus": 5,
+            "maxDurability": 5,
+            "currentDurability": 4,
+            "equipped": true
+        },
+        {
+            "name": "Dragon Orb",
+            "type": "special",
+            "defeats": "Dragon"
+        }
+    ]
+}
